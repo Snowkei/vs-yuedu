@@ -1,0 +1,135 @@
+{
+  "name": "vs-yuedu",
+  "displayName": "VS阅读器",
+  "description": "VS Code本地文件阅读器，支持在终端中阅读文件",
+  "version": "0.0.6",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:vs-yuedu.addFile",
+    "onCommand:vs-yuedu.readInTerminal"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "VS阅读器",
+      "properties": {
+        "vs-yuedu.enableRandomCode": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否在阅读内容中混合显示随机代码作为干扰"
+        },
+        "vs-yuedu.randomCodeRatio": {
+          "type": "number",
+          "default": 0.3,
+          "minimum": 0.1,
+          "maximum": 0.8,
+          "description": "随机代码在内容中的占比（0.1-0.8）"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "vs-yuedu.addFile",
+        "title": "添加文件到阅读列表",
+        "category": "VS阅读器"
+      },
+      {
+        "command": "vs-yuedu.refresh",
+        "title": "刷新阅读列表",
+        "category": "VS阅读器"
+      },
+      {
+        "command": "vs-yuedu.previousPage",
+        "title": "上一页",
+        "category": "VS阅读器"
+      },
+      {
+        "command": "vs-yuedu.nextPage",
+        "title": "下一页",
+        "category": "VS阅读器"
+      },
+      {
+        "command": "vs-yuedu.switchToTerminal",
+        "title": "切换到终端（老板键）",
+        "category": "VS阅读器"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "vs-yuedu.previousPage",
+        "key": "ctrl+shift+alt+p",
+        "mac": "cmd+shift+alt+p",
+        "when": "true"
+      },
+      {
+        "command": "vs-yuedu.nextPage",
+        "key": "ctrl+shift+alt+n",
+        "mac": "cmd+shift+alt+n",
+        "when": "true"
+      },
+      {
+        "command": "vs-yuedu.switchToTerminal",
+        "key": "ctrl+shift+alt+t",
+        "mac": "cmd+shift+alt+t",
+        "when": "true"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "vs-yuedu.sidebar",
+          "name": "VS阅读器",
+          "when": "true"
+        }
+      ]
+    },
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "vs-yuedu.addFile",
+          "when": "resourceScheme == file",
+          "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "vs-yuedu.refresh",
+          "when": "view == vs-yuedu.sidebar",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "vs-yuedu.removeFile",
+          "when": "view == vs-yuedu.sidebar && viewItem == file",
+          "group": "inline"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "vs-yuedu.addFile",
+          "when": "false"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "16.x",
+    "typescript": "^4.9.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/snowkei/vs-yuedu.git"
+  }
+}
