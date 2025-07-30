@@ -1,8 +1,9 @@
 {
   "name": "vs-yuedu",
-  "displayName": "VS阅读器",
+  "displayName": "VS-YueDu",
   "description": "VS Code本地文件阅读器，支持在终端中阅读文件",
-  "version": "0.0.1",
+  "version": "0.0.2",
+  "icon": "assets/icon.png",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -16,7 +17,7 @@
   "main": "./out/extension.js",
   "contributes": {
     "configuration": {
-      "title": "VS阅读器",
+      "title": "VS-YueDu",
       "properties": {
         "vs-yuedu.enableRandomCode": {
           "type": "boolean",
@@ -29,6 +30,33 @@
           "minimum": 0.1,
           "maximum": 0.8,
           "description": "随机代码在内容中的占比（0.1-0.8）"
+        },
+        "vs-yuedu.readingList": {
+          "type": "array",
+          "default": [],
+          "description": "阅读列表文件路径配置",
+          "items": {
+            "type": "object",
+            "properties": {
+              "filePath": {
+                "type": "string",
+                "description": "文件完整路径"
+              },
+              "displayName": {
+                "type": "string",
+                "description": "自定义显示名称（可选）"
+              },
+              "lastReadChapter": {
+                "type": "string",
+                "description": "最后阅读的章节标题（系统自动记录）"
+              },
+              "lastReadLine": {
+                "type": "number",
+                "description": "最后阅读的行号（系统自动记录）"
+              }
+            },
+            "required": ["filePath"]
+          }
         }
       }
     },
@@ -36,38 +64,38 @@
       {
         "command": "vs-yuedu.addFile",
         "title": "添加文件到阅读列表",
-        "category": "VS阅读器"
+        "category": "VS-YueDu"
       },
       {
         "command": "vs-yuedu.refresh",
         "title": "刷新阅读列表",
-        "category": "VS阅读器"
+        "category": "VS-YueDu"
       },
       {
-        "command": "vs-yuedu.previousPage",
-        "title": "上一页",
-        "category": "VS阅读器"
+        "command": "vs-yuedu.previousChapter",
+        "title": "上一章",
+        "category": "VS-YueDu"
       },
       {
-        "command": "vs-yuedu.nextPage",
-        "title": "下一页",
-        "category": "VS阅读器"
+        "command": "vs-yuedu.nextChapter",
+        "title": "下一章",
+        "category": "VS-YueDu"
       },
       {
         "command": "vs-yuedu.switchToTerminal",
         "title": "切换到终端（老板键）",
-        "category": "VS阅读器"
+        "category": "VS-YueDu"
       }
     ],
     "keybindings": [
       {
-        "command": "vs-yuedu.previousPage",
+        "command": "vs-yuedu.previousChapter",
         "key": "ctrl+shift+alt+p",
         "mac": "cmd+shift+alt+p",
         "when": "true"
       },
       {
-        "command": "vs-yuedu.nextPage",
+        "command": "vs-yuedu.nextChapter",
         "key": "ctrl+shift+alt+n",
         "mac": "cmd+shift+alt+n",
         "when": "true"
@@ -83,7 +111,7 @@
       "explorer": [
         {
           "id": "vs-yuedu.sidebar",
-          "name": "VS阅读器",
+          "name": "VS-YueDu",
           "when": "true"
         }
       ]
@@ -103,13 +131,7 @@
           "group": "navigation"
         }
       ],
-      "view/item/context": [
-        {
-          "command": "vs-yuedu.removeFile",
-          "when": "view == vs-yuedu.sidebar && viewItem == file",
-          "group": "inline"
-        }
-      ],
+
       "commandPalette": [
         {
           "command": "vs-yuedu.addFile",

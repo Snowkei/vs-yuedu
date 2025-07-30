@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
 import * as path from 'path';
+import * as fs from 'fs';
+import { FileConfigManager } from './fileConfig';
 
 export class FileItem extends vscode.TreeItem {
     constructor(
@@ -8,7 +9,8 @@ export class FileItem extends vscode.TreeItem {
         public readonly collapsibleState: vscode.TreeItemCollapsibleState,
         public readonly filePath?: string,
         public readonly isFile: boolean = false,
-        public readonly chapter?: ChapterInfo
+        public readonly chapter?: ChapterInfo,
+        public readonly chapters?: ChapterInfo[]
     ) {
         super(label, collapsibleState);
         
@@ -27,7 +29,7 @@ export class FileItem extends vscode.TreeItem {
             this.command = {
                 command: 'vs-yuedu.readChapter',
                 title: '阅读章节',
-                arguments: [chapter]
+                arguments: [chapter, chapters]
             };
             this.iconPath = new vscode.ThemeIcon('book');
             this.description = `${chapter.startLine + 1}-${chapter.endLine + 1} 行`;
@@ -51,9 +53,14 @@ export class ReadingListProvider implements vscode.TreeDataProvider<FileItem> {
     readonly onDidChangeTreeData: vscode.Event<FileItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
     private readingList: string[] = [];
+    private fileConfigManager = FileConfigManager.getInstance();
 
     refresh(): void {
         this._onDidChangeTreeData.fire();
+    }
+
+    getReadingList(): string[] {
+        return [...this.readingList];
     }
 
     addFile(filePath: string): void {
@@ -63,16 +70,13 @@ export class ReadingListProvider implements vscode.TreeDataProvider<FileItem> {
         }
     }
 
-    removeFile(filePath: string): void {
+    async removeFile(filePath: string): Promise<void> {
         const index = this.readingList.indexOf(filePath);
         if (index > -1) {
             this.readingList.splice(index, 1);
+            await this.fileConfigManager.removeFile(filePath); // 同步删除配置
             this.refresh();
         }
-    }
-
-    getReadingList(): string[] {
-        return [...this.readingList];
     }
 
     getTreeItem(element: FileItem): vscode.TreeItem {
@@ -82,26 +86,60 @@ export class ReadingListProvider implements vscode.TreeDataProvider<FileItem> {
     async getChildren(element?: FileItem): Promise<FileItem[]> {
         if (!element) {
             // 根级别显示文件列表
-            return this.readingList.map(filePath => 
-                new FileItem(
-                    path.basename(filePath),
-                    vscode.TreeItemCollapsibleState.Collapsed,
-                    filePath,
-                    true
-                )
-            );
+            const validFiles: FileItem[] = [];
+            
+            for (const filePath of this.readingList) {
+                if (fs.existsSync(filePath)) {
+                    const displayName = this.fileConfigManager.getDisplayName(filePath);
+                    const progress = this.fileConfigManager.getReadingProgress(filePath);
+                    let labelWithProgress = displayName;
+                    
+                    if (progress.chapterTitle) {
+                        labelWithProgress = `${displayName} 📖 ${progress.chapterTitle}`;
+                    }
+                    
+                    validFiles.push(new FileItem(
+                        labelWithProgress,
+                        vscode.TreeItemCollapsibleState.Collapsed,
+                        filePath,
+                        true
+                    ));
+                } else {
+                    console.warn(`文件不存在，从阅读列表中移除: ${filePath}`);
+                    // 自动移除不存在的文件
+                    this.removeFile(filePath);
+                }
+            }
+            
+            return validFiles;
         } else if (element.filePath && !element.chapter) {
             // 文件级别显示章节
-            const chapters = await this.identifyChapters(element.filePath);
-            return chapters.map(chapter => 
-                new FileItem(
-                    chapter.title,
+            if (!fs.existsSync(element.filePath)) {
+                console.error(`文件不存在: ${element.filePath}`);
+                return [];
+            }
+            
+            try {
+                const chapters = await this.identifyChapters(element.filePath);
+                return chapters.map(chapter => 
+                    new FileItem(
+                        chapter.title,
+                        vscode.TreeItemCollapsibleState.None,
+                        undefined,
+                        false,
+                        chapter,
+                        chapters
+                    )
+                );
+            } catch (error) {
+                console.error(`读取文件章节失败: ${element.filePath}`, error);
+                return [new FileItem(
+                    "读取文件失败",
                     vscode.TreeItemCollapsibleState.None,
                     undefined,
-                    false,
-                    chapter
-                )
-            );
+                    false
+                )];
+            }
         }
 
         return [];
