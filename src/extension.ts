@@ -197,9 +197,77 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
     
+    // 跳转到上次阅读位置
+    const gotoLastReadCommand = vscode.commands.registerCommand('vs-yuedu.gotoLastRead', async (fileUri?: vscode.Uri) => {
+        let targetFile: string | null = null;
+        let targetChapter: string | null = null;
+        let targetLine: number = 0;
+
+        // 如果提供了文件路径（从图形化列表调用）
+        if (fileUri && fileUri.fsPath) {
+            targetFile = fileUri.fsPath;
+        } else {
+            // 全局跳转：查找有阅读记录的文件
+            const readingList = readingListProvider.getReadingList();
+            if (readingList.length === 0) {
+                vscode.window.showInformationMessage('阅读列表为空，请先添加文件');
+                return;
+            }
+
+            for (const filePath of readingList) {
+                const progress = FileConfigManager.getInstance().getReadingProgress(filePath);
+                if (progress.chapterTitle) {
+                    targetFile = filePath;
+                    targetChapter = progress.chapterTitle;
+                    targetLine = progress.lineNumber || 0;
+                    break;
+                }
+            }
+
+            if (!targetFile || !targetChapter) {
+                vscode.window.showInformationMessage('暂无阅读记录，请先阅读任意章节');
+                return;
+            }
+        }
+
+        try {
+            // 获取阅读记录
+            if (fileUri && fileUri.fsPath) {
+                const progress = FileConfigManager.getInstance().getReadingProgress(targetFile);
+                if (!progress.chapterTitle) {
+                    vscode.window.showInformationMessage('该文件暂无阅读记录，请先阅读任意章节');
+                    return;
+                }
+                targetChapter = progress.chapterTitle;
+                targetLine = progress.lineNumber || 0;
+            }
+
+            // 识别文件章节
+            const chapters = await new ReadingListProvider().identifyChapters(targetFile);
+            const chapter = chapters.find(c => c.title === targetChapter);
+            
+            if (!chapter) {
+                vscode.window.showWarningMessage(`未找到章节 "${targetChapter}"，将从头开始阅读`);
+                const firstChapter = chapters[0];
+                if (firstChapter) {
+                    readChapterInTerminal(firstChapter, chapters);
+                }
+                return;
+            }
+
+            // 跳转到指定章节
+            readChapterInTerminal(chapter, chapters);
+            vscode.window.showInformationMessage(`已跳转到上次阅读位置: ${path.basename(targetFile)} - ${targetChapter}`);
+
+        } catch (error) {
+            vscode.window.showErrorMessage(`跳转到阅读记录失败: ${error}`);
+        }
+    });
+
     context.subscriptions.push(previousChapterCommand);
     context.subscriptions.push(nextChapterCommand);
     context.subscriptions.push(switchToTerminalCommand);
+    context.subscriptions.push(gotoLastReadCommand);
 }
 
 function generateRandomCode(): string {

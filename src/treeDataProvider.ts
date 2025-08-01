@@ -121,16 +121,24 @@ export class ReadingListProvider implements vscode.TreeDataProvider<FileItem> {
             
             try {
                 const chapters = await this.identifyChapters(element.filePath);
-                return chapters.map(chapter => 
-                    new FileItem(
-                        chapter.title,
+                const progress = this.fileConfigManager.getReadingProgress(element.filePath);
+                
+                return chapters.map(chapter => {
+                    let chapterTitle = chapter.title;
+                    // 标记当前阅读的章节
+                    if (progress.chapterTitle === chapter.title) {
+                        chapterTitle = `📍 ${chapter.title}`;
+                    }
+                    
+                    return new FileItem(
+                        chapterTitle,
                         vscode.TreeItemCollapsibleState.None,
                         undefined,
                         false,
                         chapter,
                         chapters
-                    )
-                );
+                    );
+                });
             } catch (error) {
                 console.error(`读取文件章节失败: ${element.filePath}`, error);
                 return [new FileItem(
@@ -156,7 +164,7 @@ export class ReadingListProvider implements vscode.TreeDataProvider<FileItem> {
             .substring(0, 80); // 增加标题长度限制，保留章节号
     }
 
-    private async identifyChapters(filePath: string): Promise<ChapterInfo[]> {
+    public async identifyChapters(filePath: string): Promise<ChapterInfo[]> {
         try {
             const content = fs.readFileSync(filePath, 'utf-8');
             const lines = content.split('\n');

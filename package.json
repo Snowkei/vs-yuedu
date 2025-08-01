@@ -12,7 +12,8 @@
   ],
   "activationEvents": [
     "onCommand:vs-yuedu.addFile",
-    "onCommand:vs-yuedu.readInTerminal"
+    "onCommand:vs-yuedu.readInTerminal",
+    "onCommand:vs-yuedu.gotoLastRead"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -85,6 +86,16 @@
         "command": "vs-yuedu.switchToTerminal",
         "title": "切换到终端（老板键）",
         "category": "VS-YueDu"
+      },
+      {
+        "command": "vs-yuedu.readChapter",
+        "title": "阅读章节",
+        "category": "VS-YueDu"
+      },
+      {
+        "command": "vs-yuedu.gotoLastRead",
+        "title": "跳转到上次阅读位置",
+        "category": "VS-YueDu"
       }
     ],
     "keybindings": [
@@ -104,6 +115,12 @@
         "command": "vs-yuedu.switchToTerminal",
         "key": "ctrl+shift+alt+t",
         "mac": "cmd+shift+alt+t",
+        "when": "true"
+      },
+      {
+        "command": "vs-yuedu.gotoLastRead",
+        "key": "ctrl+shift+alt+l",
+        "mac": "cmd+shift+alt+l",
         "when": "true"
       }
     ],
@@ -136,6 +153,13 @@
         {
           "command": "vs-yuedu.addFile",
           "when": "false"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "vs-yuedu.gotoLastRead",
+          "when": "view == vs-yuedu.sidebar && viewItem == file",
+          "group": "navigation@1"
         }
       ]
     }
