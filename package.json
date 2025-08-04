@@ -3,6 +3,7 @@
   "displayName": "VS-YueDu",
   "description": "VS Code本地文件阅读器，支持在终端中阅读文件",
   "version": "0.0.2",
+  "publisher": "snowkei",
   "icon": "assets/icon.png",
   "engines": {
     "vscode": "^1.74.0"

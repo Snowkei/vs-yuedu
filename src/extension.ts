@@ -82,6 +82,37 @@ export function activate(context: vscode.ExtensionContext) {
 
     // 初始同步配置
     syncReadingListFromConfig();
+    
+    // 自动跳转到上次阅读位置
+    const autoJumpToLastRead = async () => {
+        const readingList = readingListProvider.getReadingList();
+        if (readingList.length === 0) {
+            return;
+        }
+
+        // 查找有阅读记录的文件
+        for (const filePath of readingList) {
+            const progress = FileConfigManager.getInstance().getReadingProgress(filePath);
+            if (progress.chapterTitle) {
+                try {
+                    const chapters = await readingListProvider.identifyChapters(filePath);
+                    const chapter = chapters.find(c => c.title === progress.chapterTitle);
+                    if (chapter) {
+                        readChapterInTerminal(chapter, chapters);
+                        vscode.window.showInformationMessage(`已自动跳转到上次阅读位置: ${path.basename(filePath)} - ${progress.chapterTitle}`);
+                        break;
+                    }
+                } catch (error) {
+                    console.error(`自动跳转失败: ${filePath}`, error);
+                }
+            }
+        }
+    };
+
+    // 延迟执行自动跳转，确保视图完全加载
+    setTimeout(() => {
+        autoJumpToLastRead();
+    }, 1000);
 
     // 监听配置变化
     context.subscriptions.push(

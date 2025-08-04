@@ -98,9 +98,14 @@ export class ReadingListProvider implements vscode.TreeDataProvider<FileItem> {
                         labelWithProgress = `${displayName} 📖 ${progress.chapterTitle}`;
                     }
                     
+                    // 如果有阅读记录，自动展开该文件
+                    const collapsibleState = progress.chapterTitle 
+                        ? vscode.TreeItemCollapsibleState.Expanded 
+                        : vscode.TreeItemCollapsibleState.Collapsed;
+                    
                     validFiles.push(new FileItem(
                         labelWithProgress,
-                        vscode.TreeItemCollapsibleState.Collapsed,
+                        collapsibleState,
                         filePath,
                         true
                     ));
