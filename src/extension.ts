@@ -109,10 +109,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     };
 
-    // 延迟执行自动跳转，确保视图完全加载
-    setTimeout(() => {
-        autoJumpToLastRead();
-    }, 1000);
+    // 移除自动跳转功能，改为手动触发
 
     // 监听配置变化
     context.subscriptions.push(
