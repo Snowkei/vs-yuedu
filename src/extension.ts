@@ -6,12 +6,18 @@ import { FileConfigManager } from './fileConfig';
 
 let readingListProvider: ReadingListProvider;
 let outputChannel: vscode.OutputChannel;
+let readingPanel: vscode.WebviewPanel | undefined; // 新增：阅读器面板
 
 // 章节导航状态管理
 let currentChapter: ChapterInfo | null = null;
 let allChapters: ChapterInfo[] = [];
 let currentChapterIndex: number = 0;
 let chapterLines: string[] = [];
+
+// 新增：状态栏按钮管理
+let previousChapterStatusBarItem: vscode.StatusBarItem;
+let switchToTerminalStatusBarItem: vscode.StatusBarItem;
+let nextChapterStatusBarItem: vscode.StatusBarItem;
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('VS-YueDu插件已激活');
@@ -220,8 +226,31 @@ export function activate(context: vscode.ExtensionContext) {
     });
     
     const switchToTerminalCommand = vscode.commands.registerCommand('vs-yuedu.switchToTerminal', () => {
-        if (outputChannel) {
-            outputChannel.show();
+        // 获取当前活动的编辑器
+        const activeEditor = vscode.window.activeTextEditor;
+        const activeTerminal = vscode.window.activeTerminal;
+        
+        // 检查当前是否在VS-YueDu的输出通道中
+        const isInYueDuOutput = outputChannel && 
+            vscode.window.visibleTextEditors.some(editor => 
+                editor.document.uri.scheme === 'output' && 
+                editor.document.fileName.includes('VS-YueDu')
+            );
+        
+        if (currentChapter && (isInYueDuOutput || activeTerminal)) {
+            // 如果在yuedu中或在终端中，切换到终端
+            vscode.commands.executeCommand('workbench.action.terminal.focus');
+            vscode.window.showInformationMessage('已切换到终端');
+        } else {
+            // 如果在其他地方，且有阅读记录，跳回阅读
+            if (currentChapter) {
+                // 显示VS-YueDu输出通道
+                outputChannel.show();
+                vscode.window.showInformationMessage('已返回阅读');
+            } else {
+                // 如果没有当前阅读，尝试跳转到上次阅读位置
+                vscode.commands.executeCommand('vs-yuedu.gotoLastRead');
+            }
         }
     });
     
@@ -296,6 +325,41 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(nextChapterCommand);
     context.subscriptions.push(switchToTerminalCommand);
     context.subscriptions.push(gotoLastReadCommand);
+
+    // 创建状态栏按钮 - 左侧对齐的三个功能按钮
+    previousChapterStatusBarItem = vscode.window.createStatusBarItem(
+        vscode.StatusBarAlignment.Left,
+        100
+    );
+    previousChapterStatusBarItem.text = "$(chevron-left)";
+    previousChapterStatusBarItem.tooltip = "上一章";
+    previousChapterStatusBarItem.command = "vs-yuedu.previousChapter";
+
+    switchToTerminalStatusBarItem = vscode.window.createStatusBarItem(
+        vscode.StatusBarAlignment.Left,
+        99
+    );
+    switchToTerminalStatusBarItem.text = "$(terminal)";
+    switchToTerminalStatusBarItem.tooltip = "切换到终端（老板键）";
+    switchToTerminalStatusBarItem.command = "vs-yuedu.switchToTerminal";
+
+    nextChapterStatusBarItem = vscode.window.createStatusBarItem(
+        vscode.StatusBarAlignment.Left,
+        98
+    );
+    nextChapterStatusBarItem.text = "$(chevron-right)";
+    nextChapterStatusBarItem.tooltip = "下一章";
+    nextChapterStatusBarItem.command = "vs-yuedu.nextChapter";
+
+    // 初始隐藏状态栏按钮
+    previousChapterStatusBarItem.hide();
+    switchToTerminalStatusBarItem.hide();
+    nextChapterStatusBarItem.hide();
+
+    // 注册状态栏项目
+    context.subscriptions.push(previousChapterStatusBarItem);
+    context.subscriptions.push(switchToTerminalStatusBarItem);
+    context.subscriptions.push(nextChapterStatusBarItem);
 }
 
 function generateRandomCode(): string {
@@ -320,8 +384,6 @@ function generateRandomCode(): string {
     
     return `[${timestamp}] ${level} ${component}: ${action}`;
 }
-
-
 
 function mixRandomCode(originalLines: string[], ratio: number): string[] {
     const mixedLines: string[] = [];
@@ -377,6 +439,32 @@ async function readChapterInTerminal(chapter: ChapterInfo, chapters?: ChapterInf
     }
 }
 
+// 更新状态栏按钮的可见性
+function updateStatusBarVisibility() {
+    if (currentChapter) {
+        // 显示所有三个状态栏按钮
+        previousChapterStatusBarItem.show();
+        switchToTerminalStatusBarItem.show();
+        nextChapterStatusBarItem.show();
+        
+        // 更新上一章按钮的启用状态
+        const hasPrevious = allChapters.length > 0 && currentChapterIndex > 0;
+        previousChapterStatusBarItem.text = hasPrevious ? "$(chevron-left)" : "$(circle-slash)";
+        previousChapterStatusBarItem.tooltip = hasPrevious ? "上一章" : "已是第一章";
+        
+        // 更新下一章按钮的启用状态
+        const hasNext = allChapters.length > 0 && currentChapterIndex < allChapters.length - 1;
+        nextChapterStatusBarItem.text = hasNext ? "$(chevron-right)" : "$(circle-slash)";
+        nextChapterStatusBarItem.tooltip = hasNext ? "下一章" : "已是最后一章";
+    } else {
+        // 隐藏所有状态栏按钮
+        previousChapterStatusBarItem.hide();
+        switchToTerminalStatusBarItem.hide();
+        nextChapterStatusBarItem.hide();
+    }
+}
+
+// 显示章节内容
 function displayChapter() {
     if (!currentChapter) return;
     
@@ -387,32 +475,32 @@ function displayChapter() {
     const fileStats = fs.statSync(currentChapter.filePath);
     const fileSizeInMB = fileStats.size / (1024 * 1024);
     
-    outputChannel.clear();
-    outputChannel.show();
-    
+    // 构建要显示的内容
     const fileName = path.basename(currentChapter.filePath);
     const separator = '═'.repeat(60);
     
+    let contentLines: string[] = [];
+    
     // 显示章节信息
-    outputChannel.appendLine(separator);
-    outputChannel.appendLine(`📖 正在阅读: ${fileName}`);
-    outputChannel.appendLine(`📑 章节: ${currentChapter.title}`);
-    outputChannel.appendLine(`📊 共 ${currentChapter.lineCount} 行`);
-    outputChannel.appendLine(`📁 文件大小: ${fileSizeInMB.toFixed(1)}MB`);
+    contentLines.push(separator);
+    contentLines.push(`📖 正在阅读: ${fileName}`);
+    contentLines.push(`📑 章节: ${currentChapter.title}`);
+    contentLines.push(`📊 共 ${currentChapter.lineCount} 行`);
+    contentLines.push(`📁 文件大小: ${fileSizeInMB.toFixed(1)}MB`);
     
     if (allChapters.length > 1) {
-        outputChannel.appendLine(`📚 章节进度: ${currentChapterIndex + 1}/${allChapters.length}`);
+        contentLines.push(`📚 章节进度: ${currentChapterIndex + 1}/${allChapters.length}`);
     }
     
     if (enableRandomCode) {
-        outputChannel.appendLine(`🎲 随机代码模式: 开启 (${(randomCodeRatio * 100).toFixed(0)}%)`);
+        contentLines.push(`🎲 随机代码模式: 开启 (${(randomCodeRatio * 100).toFixed(0)}%)`);
     }
     
-    outputChannel.appendLine(separator);
-    outputChannel.appendLine('');
+    contentLines.push(separator);
+    contentLines.push('');
     
     // 根据配置决定是否混合随机代码
-    let displayLines: string[];
+    let displayLines: string[] = [];
     if (enableRandomCode) {
         displayLines = mixRandomCode(chapterLines, randomCodeRatio);
     } else {
@@ -426,20 +514,31 @@ function displayChapter() {
         
         if (displayLine.match(/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] \w+ \w+:/)) {
             // 识别为运行日志格式
-            outputChannel.appendLine(`${originalLineNum.toString().padStart(4, ' ')}: 📊 ${displayLine}`);
+            contentLines.push(`${originalLineNum.toString().padStart(4, ' ')}: 📊 ${displayLine}`);
         } else {
             // 正文内容
-            outputChannel.appendLine(`${originalLineNum.toString().padStart(4, ' ')}: 📄 ${displayLine}`);
+            contentLines.push(`${originalLineNum.toString().padStart(4, ' ')}: 📄 ${displayLine}`);
         }
     });
     
     if (enableRandomCode) {
-        outputChannel.appendLine('');
-        outputChannel.appendLine('📋 图例:');
-        outputChannel.appendLine('📊 运行日志（干扰项）');
-        outputChannel.appendLine('📄 正文内容');
-        outputChannel.appendLine('💡 可在设置中关闭随机代码模式');
+        contentLines.push('');
+        contentLines.push('📋 图例:');
+        contentLines.push('📊 运行日志（干扰项）');
+        contentLines.push('📄 正文内容');
+        contentLines.push('💡 可在设置中关闭随机代码模式');
     }
+    
+    // 恢复原始显示逻辑：直接清除并显示内容
+    outputChannel.clear();
+    outputChannel.show();
+    
+    // 一次性添加所有内容
+    const fullContent = contentLines.join('\n');
+    outputChannel.append(fullContent);
+    
+    // 更新状态栏按钮可见性
+    updateStatusBarVisibility();
 }
 
 export function deactivate() {
